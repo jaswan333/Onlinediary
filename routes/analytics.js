@@ -9,28 +9,25 @@ router.use(adminMiddleware);
 router.get('/stats', (req, res) => {
   const stats = {};
 
-  // Total users
-  db.get('SELECT COUNT(*) as count FROM users', (err, result) => {
+  db.query('SELECT COUNT(*) as count FROM users', (err, result) => {
     if (err) return res.status(500).json({ error: 'Database error' });
-    stats.totalUsers = result.count;
+    stats.totalUsers = result[0].count;
 
-    // Total entries
-    db.get('SELECT COUNT(*) as count FROM entries', (err, result) => {
+    db.query('SELECT COUNT(*) as count FROM entries', (err, result) => {
       if (err) return res.status(500).json({ error: 'Database error' });
-      stats.totalEntries = result.count;
+      stats.totalEntries = result[0].count;
 
-      // Entries this month
-      db.get(
+      db.query(
         `SELECT COUNT(*) as count FROM entries 
-         WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')`,
+         WHERE YEAR(created_at) = YEAR(CURDATE()) 
+         AND MONTH(created_at) = MONTH(CURDATE())`,
         (err, result) => {
           if (err) return res.status(500).json({ error: 'Database error' });
-          stats.entriesThisMonth = result.count;
+          stats.entriesThisMonth = result[0].count;
 
-          // Total pages (assuming 500 chars per page)
-          db.get('SELECT SUM(LENGTH(content)) as totalChars FROM entries', (err, result) => {
+          db.query('SELECT SUM(LENGTH(content)) as totalChars FROM entries', (err, result) => {
             if (err) return res.status(500).json({ error: 'Database error' });
-            stats.totalPages = Math.ceil((result.totalChars || 0) / 500);
+            stats.totalPages = Math.ceil((result[0].totalChars || 0) / 500);
 
             res.json(stats);
           });
@@ -51,15 +48,16 @@ router.get('/users', (req, res) => {
       COUNT(e.id) as entry_count
     FROM users u
     LEFT JOIN entries e ON u.id = e.user_id
-    GROUP BY u.id
+    GROUP BY u.id, u.username, u.email, u.created_at
     ORDER BY u.created_at DESC
   `;
 
-  db.all(query, (err, users) => {
+  db.query(query, (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json(users);
+    res.json(results);
   });
 });
 
@@ -67,7 +65,7 @@ router.get('/users', (req, res) => {
 router.get('/entries-by-month', (req, res) => {
   const query = `
     SELECT 
-      strftime('%Y-%m', created_at) as month,
+      DATE_FORMAT(created_at, '%Y-%m') as month,
       COUNT(*) as count
     FROM entries
     GROUP BY month
@@ -75,11 +73,12 @@ router.get('/entries-by-month', (req, res) => {
     LIMIT 12
   `;
 
-  db.all(query, (err, data) => {
+  db.query(query, (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json(data);
+    res.json(results);
   });
 });
 
@@ -95,11 +94,12 @@ router.get('/mood-stats', (req, res) => {
     ORDER BY count DESC
   `;
 
-  db.all(query, (err, data) => {
+  db.query(query, (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json(data);
+    res.json(results);
   });
 });
 
@@ -118,11 +118,12 @@ router.get('/recent-entries', (req, res) => {
     LIMIT 10
   `;
 
-  db.all(query, (err, entries) => {
+  db.query(query, (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json(entries);
+    res.json(results);
   });
 });
 
@@ -130,7 +131,7 @@ router.get('/recent-entries', (req, res) => {
 router.get('/user-growth', (req, res) => {
   const query = `
     SELECT 
-      strftime('%Y-%m', created_at) as month,
+      DATE_FORMAT(created_at, '%Y-%m') as month,
       COUNT(*) as count
     FROM users
     GROUP BY month
@@ -138,11 +139,12 @@ router.get('/user-growth', (req, res) => {
     LIMIT 12
   `;
 
-  db.all(query, (err, data) => {
+  db.query(query, (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json(data);
+    res.json(results);
   });
 });
 

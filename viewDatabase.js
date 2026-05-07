@@ -1,11 +1,11 @@
 const db = require('./database');
 
 console.log('\n========================================');
-console.log('📊 DIARY DATABASE VIEWER');
+console.log('📊 DIARY DATABASE VIEWER (MySQL)');
 console.log('========================================\n');
 
 // View all users
-db.all('SELECT * FROM users', (err, users) => {
+db.query('SELECT * FROM users', (err, users) => {
   if (err) {
     console.error('Error fetching users:', err);
     return;
@@ -16,7 +16,7 @@ db.all('SELECT * FROM users', (err, users) => {
   console.table(users);
   
   // View all entries
-  db.all(`
+  db.query(`
     SELECT 
       e.id,
       e.title,
@@ -38,12 +38,12 @@ db.all('SELECT * FROM users', (err, users) => {
     console.table(entries);
     
     // Statistics
-    db.get('SELECT COUNT(*) as count FROM users', (err, userCount) => {
-      db.get('SELECT COUNT(*) as count FROM entries', (err, entryCount) => {
+    db.query('SELECT COUNT(*) as count FROM users', (err, userCount) => {
+      db.query('SELECT COUNT(*) as count FROM entries', (err, entryCount) => {
         console.log('\n📈 STATISTICS:');
         console.log('----------------------------------------');
-        console.log(`Total Users: ${userCount.count}`);
-        console.log(`Total Entries: ${entryCount.count}`);
+        console.log(`Total Users: ${userCount[0].count}`);
+        console.log(`Total Entries: ${entryCount[0].count}`);
         console.log('========================================\n');
         
         process.exit(0);

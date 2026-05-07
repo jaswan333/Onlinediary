@@ -14,22 +14,25 @@ router.post('/signup', async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    db.run(
+    db.query(
       'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
       [username, email, hashedPassword],
-      function (err) {
+      (err, result) => {
         if (err) {
-          if (err.message.includes('UNIQUE')) {
+          if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ error: 'Username or email already exists' });
           }
+          console.error('Database error:', err);
           return res.status(500).json({ error: 'Database error' });
         }
 
-        const token = jwt.sign({ userId: this.lastID }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        res.status(201).json({ token, userId: this.lastID, username });
+        const userId = result.insertId;
+        const token = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.status(201).json({ token, userId, username });
       }
     );
   } catch (error) {
+    console.error('Server error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -41,14 +44,17 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
+  db.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    if (!user) {
+    if (results.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    const user = results[0];
 
     try {
       const isMatch = await bcrypt.compare(password, user.password);
@@ -60,6 +66,7 @@ router.post('/login', (req, res) => {
       const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
       res.json({ token, userId: user.id, username: user.username });
     } catch (error) {
+      console.error('Server error:', error);
       res.status(500).json({ error: 'Server error' });
     }
   });

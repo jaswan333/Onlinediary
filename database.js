@@ -1,39 +1,35 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const mysql = require('mysql2');
+require('dotenv').config();
 
-const db = new sqlite3.Database(path.join(__dirname, 'diary.db'), (err) => {
+// Create connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'online_diary',
+  port: process.env.DB_PORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+// Get promise-based pool
+const promisePool = pool.promise();
+
+// Test connection
+pool.getConnection((err, connection) => {
   if (err) {
-    console.error('Error opening database:', err.message);
+    console.error('Error connecting to MySQL database:', err.message);
+    console.error('Please ensure:');
+    console.error('1. MySQL server is running');
+    console.error('2. Database "online_diary" exists');
+    console.error('3. Credentials in .env are correct');
+    process.exit(1);
   } else {
-    console.log('Connected to SQLite database');
-    initDatabase();
+    console.log('✅ Connected to MySQL database successfully');
+    connection.release();
   }
 });
 
-function initDatabase() {
-  db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS entries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      content TEXT NOT NULL,
-      mood TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`);
-
-    db.run(`CREATE INDEX IF NOT EXISTS idx_entries_user_id ON entries(user_id)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at)`);
-  });
-}
-
-module.exports = db;
+module.exports = pool;
+module.exports.promisePool = promisePool;

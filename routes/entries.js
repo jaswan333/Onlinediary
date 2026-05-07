@@ -13,19 +13,21 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Title and content are required' });
   }
 
-  db.run(
+  db.query(
     'INSERT INTO entries (user_id, title, content, mood) VALUES (?, ?, ?, ?)',
     [userId, title, content, mood || null],
-    function (err) {
+    (err, result) => {
       if (err) {
+        console.error('Database error:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      db.get('SELECT * FROM entries WHERE id = ?', [this.lastID], (err, entry) => {
+      db.query('SELECT * FROM entries WHERE id = ?', [result.insertId], (err, results) => {
         if (err) {
+          console.error('Database error:', err);
           return res.status(500).json({ error: 'Database error' });
         }
-        res.status(201).json(entry);
+        res.status(201).json(results[0]);
       });
     }
   );
@@ -44,22 +46,23 @@ router.get('/', (req, res) => {
   }
 
   if (startDate) {
-    query += ' AND date(created_at) >= date(?)';
+    query += ' AND DATE(created_at) >= ?';
     params.push(startDate);
   }
 
   if (endDate) {
-    query += ' AND date(created_at) <= date(?)';
+    query += ' AND DATE(created_at) <= ?';
     params.push(endDate);
   }
 
   query += ' ORDER BY created_at DESC';
 
-  db.all(query, params, (err, entries) => {
+  db.query(query, params, (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
-    res.json(entries);
+    res.json(results);
   });
 });
 
@@ -67,16 +70,17 @@ router.get('/:id', (req, res) => {
   const userId = req.userId;
   const entryId = req.params.id;
 
-  db.get('SELECT * FROM entries WHERE id = ? AND user_id = ?', [entryId, userId], (err, entry) => {
+  db.query('SELECT * FROM entries WHERE id = ? AND user_id = ?', [entryId, userId], (err, results) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    if (!entry) {
+    if (results.length === 0) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
-    res.json(entry);
+    res.json(results[0]);
   });
 });
 
@@ -89,23 +93,25 @@ router.put('/:id', (req, res) => {
     return res.status(400).json({ error: 'Title and content are required' });
   }
 
-  db.run(
+  db.query(
     'UPDATE entries SET title = ?, content = ?, mood = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
     [title, content, mood || null, entryId, userId],
-    function (err) {
+    (err, result) => {
       if (err) {
+        console.error('Database error:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
-      if (this.changes === 0) {
+      if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Entry not found' });
       }
 
-      db.get('SELECT * FROM entries WHERE id = ?', [entryId], (err, entry) => {
+      db.query('SELECT * FROM entries WHERE id = ?', [entryId], (err, results) => {
         if (err) {
+          console.error('Database error:', err);
           return res.status(500).json({ error: 'Database error' });
         }
-        res.json(entry);
+        res.json(results[0]);
       });
     }
   );
@@ -115,12 +121,13 @@ router.delete('/:id', (req, res) => {
   const userId = req.userId;
   const entryId = req.params.id;
 
-  db.run('DELETE FROM entries WHERE id = ? AND user_id = ?', [entryId, userId], function (err) {
+  db.query('DELETE FROM entries WHERE id = ? AND user_id = ?', [entryId, userId], (err, result) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    if (this.changes === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
